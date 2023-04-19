@@ -249,7 +249,9 @@ class PyInstArchive:
 
     def extractFiles(self):
         print('[+] Beginning extraction...please standby')
-        extractionDir = os.path.join(os.getcwd(), os.path.basename(self.filePath) + '_extracted')
+        extractionDir = os.path.join(
+            os.getcwd(), f'{os.path.basename(self.filePath)}_extracted'
+        )
 
         if not os.path.exists(extractionDir):
             os.mkdir(extractionDir)
@@ -258,10 +260,8 @@ class PyInstArchive:
 
         for entry in self.tocList:
             basePath = os.path.dirname(entry.name)
-            if basePath != '':
-                # Check if path exists, create if not
-                if not os.path.exists(basePath):
-                    os.makedirs(basePath)
+            if basePath != '' and not os.path.exists(basePath):
+                os.makedirs(basePath)
 
             self.fPtr.seek(entry.position, os.SEEK_SET)
             data = self.fPtr.read(entry.cmprsdDataSize)
@@ -276,18 +276,18 @@ class PyInstArchive:
                 # s -> ARCHIVE_ITEM_PYSOURCE
                 # Entry point are expected to be python scripts
                 print('[+] Possible entry point: {0}.pyc'.format(entry.name))
-                self._writePyc(entry.name + '.pyc', data)
+                self._writePyc(f'{entry.name}.pyc', data)
 
-            elif entry.typeCmprsData == b'M' or entry.typeCmprsData == b'm':
+            elif entry.typeCmprsData in [b'M', b'm']:
                 # M -> ARCHIVE_ITEM_PYPACKAGE
                 # m -> ARCHIVE_ITEM_PYMODULE
                 # packages and modules are pyc files with their header's intact
-                self._writeRawData(entry.name + '.pyc', data)
+                self._writeRawData(f'{entry.name}.pyc', data)
 
             else:
                 self._writeRawData(entry.name, data)
 
-                if entry.typeCmprsData == b'z' or entry.typeCmprsData == b'Z':
+                if entry.typeCmprsData in [b'z', b'Z']:
                     self._extractPyz(entry.name)
 
 
@@ -308,7 +308,7 @@ class PyInstArchive:
 
 
     def _extractPyz(self, name):
-        dirName =  name + '_extracted'
+        dirName = f'{name}_extracted'
         # Create a directory for the contents of the pyz
         if not os.path.exists(dirName):
             os.mkdir(dirName)
@@ -359,7 +359,7 @@ class PyInstArchive:
                     filePath = os.path.join(dirName, fileName, '__init__.pyc')
 
                 else:
-                    filePath = os.path.join(dirName, fileName + '.pyc')
+                    filePath = os.path.join(dirName, f'{fileName}.pyc')
 
                 fileDir = os.path.dirname(filePath)
                 if not os.path.exists(fileDir):
@@ -370,7 +370,7 @@ class PyInstArchive:
                     data = zlib.decompress(data)
                 except:
                     print('[!] Error: Failed to decompress {0}, probably encrypted. Extracting as is.'.format(filePath))
-                    open(filePath + '.encrypted', 'wb').write(data)
+                    open(f'{filePath}.encrypted', 'wb').write(data)
                 else:
                     self._writePyc(filePath, data)
 
@@ -382,15 +382,14 @@ def main():
     else:
         arch = PyInstArchive(sys.argv[1])
         if arch.open():
-            if arch.checkFile():
-                if arch.getCArchiveInfo():
-                    arch.parseTOC()
-                    arch.extractFiles()
-                    arch.close()
-                    print('[+] Successfully extracted pyinstaller archive: {0}'.format(sys.argv[1]))
-                    print('')
-                    print('You can now use a python decompiler on the pyc files within the extracted directory')
-                    return
+            if arch.checkFile() and arch.getCArchiveInfo():
+                arch.parseTOC()
+                arch.extractFiles()
+                arch.close()
+                print('[+] Successfully extracted pyinstaller archive: {0}'.format(sys.argv[1]))
+                print('')
+                print('You can now use a python decompiler on the pyc files within the extracted directory')
+                return
 
             arch.close()
 
